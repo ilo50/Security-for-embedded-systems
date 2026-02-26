@@ -75,10 +75,13 @@ public class Main {
                                   VehicleContext vehicle) {
         System.out.print(profile.name() + " ... ");
 
-        // Generate keys for all three roles
+        // Generate asymetric keys for all three roles
         KeyPair oemKey = profile.signer().generateKeyPair();
         KeyPair directorKey = profile.signer().generateKeyPair();
         KeyPair ecuKey = profile.keyWrapper().generateRecipientKeyPair();
+
+        //generate symetric keys
+        
 
         // OEM packages the firmware
         OemPackager oem = new OemPackager(profile, oemKey);

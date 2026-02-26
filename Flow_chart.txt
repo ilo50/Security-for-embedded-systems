@@ -1,0 +1,24 @@
+Steps of the uptane update process
+
+ # 1 
+
+ the ECU sends a vehicle manifest to the director.
+
+ # 2
+
+ Director uses this information to decide which 
+ images should be installed next
+
+ # 3
+
+ Director tells ECU to install certain update
+
+ # 4 
+
+ The ECU downloads metadata from director and image 
+ repository and cross validates them.
+
+ # 5
+
+ ECU downloads firmware from image repository,
+ then verifies hash matches metadata confirms size
