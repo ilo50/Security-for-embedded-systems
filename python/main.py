@@ -50,10 +50,13 @@ def run_benchmark(name, key_gen_func, sign_func, verify_func, hash_func, iterati
         if debug: print(f"\n[Iteration {i+1}] [{ecu.ecu_id}] Starting update pipeline. Current version: {ecu.installed_version}")
         
         # Step 1: Send Vehicle Manifest (currently installed versions + ECU identifiers)
+        # this step can be done using symmetric key. (test this)
         manifest = ecu.send_manifest()
         
         # Step 2: Analyse manifest, decide which firmware images to install
         # behövs väl inte
+        #  - jo tror att det är bra för att directorns måste verify signaturen av ECU 
+        # ( kan göras med antingen symmetric eller asymmetric keys) vilket vi får testa
     
         # Step 3: Publish signed Targets metadata (specifying which update to install)
         director_payload = director.analyze_manifest_and_get_targets(manifest)
