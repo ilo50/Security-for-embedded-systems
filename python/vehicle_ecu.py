@@ -1,10 +1,11 @@
 class VehicleECU:
-    def __init__(self, ecu_id, private_key, sign_func, verify_func, hash_func, decrypt_func, director_public_key, image_repo_public_key, debug=False):
+    def __init__(self, ecu_id, private_key, identity_sign_func, identity_verify_func, payload_verify_func, hash_func, decrypt_func, director_public_key, image_repo_public_key, debug=False):
         self.ecu_id = ecu_id
         self.private_key = private_key
-        self.sign_func = sign_func
+        self.identity_sign_func = identity_sign_func
         self.installed_version = "v1.0"
-        self.verify_func = verify_func
+        self.identity_verify_func = identity_verify_func
+        self.payload_verify_func = payload_verify_func
         self.hash_func = hash_func
         self.decrypt_func = decrypt_func
         self.director_public_key = director_public_key
@@ -15,7 +16,7 @@ class VehicleECU:
         """Step 1 & Step 6: Generate Vehicle Manifest"""
         manifest = {"ecu_id": self.ecu_id, "installed_version": self.installed_version}
         manifest_bytes = str(manifest).encode('utf-8')
-        signature = self.sign_func(self.private_key, manifest_bytes)
+        signature = self.identity_sign_func(self.private_key, manifest_bytes)
         return {
             "manifest": manifest,
             "signature": signature.hex()
@@ -24,8 +25,8 @@ class VehicleECU:
     def verify_metadata(self, director_payload, image_repo_payload):
         if self.debug: print(f"[{self.ecu_id}] Cross-validating metadata and verifying signatures...")
         try:
-            self.verify_func(self.director_public_key, director_payload["signature"], str(director_payload["metadata"]).encode('utf-8'))
-            self.verify_func(self.image_repo_public_key, image_repo_payload["signature"], str(image_repo_payload["metadata"]).encode('utf-8'))
+            self.identity_verify_func(self.director_public_key, director_payload["signature"], str(director_payload["metadata"]).encode('utf-8'))
+            self.payload_verify_func(self.image_repo_public_key, image_repo_payload["signature"], str(image_repo_payload["metadata"]).encode('utf-8'))
         except Exception as e:
             if self.debug: print(f"[{self.ecu_id}] [FAIL] Signature Validation Failed. Aborting update error: {e}")
             return False

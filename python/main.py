@@ -22,43 +22,35 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
     sym_key = sym_key_gen()
     if debug: print(f"[Setup] Key generation took: {(time.perf_counter() - setup_start)*1000:.4f} ms")
 
-    timings = {'sign': 0.0, 'verify': 0.0, 'hash': 0.0, 'decrypt': 0.0, 'encrypt': 0.0}
+    timer = crypto.BenchmarkTimer(iterations)
 
-    def timed_sign(*args):
-        start = time.perf_counter()
-        res = sign_func(*args)
-        timings['sign'] += (time.perf_counter() - start) * 1000
-        return res
-
-    def timed_verify(*args):
-        start = time.perf_counter()
-        res = verify_func(*args)
-        timings['verify'] += (time.perf_counter() - start) * 1000
-        return res
-
-    def timed_hash(*args):
-        start = time.perf_counter()
-        res = hash_func(*args)
-        timings['hash'] += (time.perf_counter() - start) * 1000
-        return res
-
-    def timed_decrypt(*args):
-        start = time.perf_counter()
-        res = decrypt_func(*args)
-        timings['decrypt'] += (time.perf_counter() - start) * 1000
-        return res
-
-    def timed_encrypt(*args):
-        start = time.perf_counter()
-        res = encrypt_func(*args)
-        timings['encrypt'] += (time.perf_counter() - start) * 1000
-        return res
-
-    director = DirectorRepository(director_priv, timed_sign, sym_key, ecu_pub, timed_verify, debug=debug)
-    image_repo = ImageRepository(image_priv, timed_sign, timed_hash, sym_key, timed_encrypt)
-    ecu = VehicleECU("ECU_FRONT_01", ecu_priv, timed_sign, timed_verify, timed_hash, timed_decrypt, director_pub, image_pub, debug=debug)
-
-    total_flow_time = 0.0
+    director = DirectorRepository(
+        director_priv, 
+        timer.timed_op(sign_func, 'identity_sign'), 
+        sym_key, 
+        ecu_pub, 
+        timer.timed_op(verify_func, 'identity_verify'), 
+        debug=debug
+    )
+    image_repo = ImageRepository(
+        image_priv, 
+        timer.timed_op(sign_func, 'payload_sign'), 
+        timer.timed_op(hash_func, 'hash'), 
+        sym_key, 
+        timer.timed_op(encrypt_func, 'encrypt')
+    )
+    ecu = VehicleECU(
+        "ECU_FRONT_01", 
+        ecu_priv, 
+        timer.timed_op(sign_func, 'identity_sign'), 
+        timer.timed_op(verify_func, 'identity_verify'), 
+        timer.timed_op(verify_func, 'payload_verify'), 
+        timer.timed_op(hash_func, 'hash'), 
+        timer.timed_op(decrypt_func, 'decrypt'), 
+        director_pub, 
+        image_pub, 
+        debug=debug
+    )
 
     # ================= Benchmark the whole update flow =================
     for i in range(iterations):
@@ -74,6 +66,9 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
         # behövs väl inte
         #  - jo tror att det är bra för att directorns måste verify signaturen av ECU 
         # ( kan göras med antingen symmetric eller asymmetric keys) vilket vi får testa
+
+        # FIX
+        # Lade till sign/verif i ecu.send_manifest och director_repo.py och använder just nu asymmetrisk kryptering
     
         # Step 3: Publish signed Targets metadata (specifying which update to install)
         director_payload = director.analyze_manifest_and_get_targets(manifest)
@@ -110,7 +105,7 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
         director.confirm_update(updated_manifest)
         
         # Time calc
-        total_flow_time += (time.perf_counter() - flow_start) * 1000
+        timer.add_flow_time((time.perf_counter() - flow_start) * 1000)
         
         # Reset ECU for next iteration
         ecu.installed_version = "v1.0"
@@ -119,13 +114,7 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
     # For a more exact label, we fetch its size:
     payload_size_kb = len(image_repo.raw_firmware) / 1024.0
 
-    print(f"--- Flow Complete (Average over {iterations} runs) ---")
-    print(f"Avg Total UpdateTime: {total_flow_time / iterations:.4f} ms")
-    print(f"Avg Signing Time:    {timings['sign'] / iterations:.4f} ms")
-    print(f"Avg Verifying Time:  {timings['verify'] / iterations:.4f} ms")
-    print(f"Avg Encrypting Time: {timings['encrypt'] / iterations:.4f} ms ({payload_size_kb:.1f}KB)")
-    print(f"Avg Decrypting Time: {timings['decrypt'] / iterations:.4f} ms ({payload_size_kb:.1f}KB)")
-    print(f"Avg Hashing Time:    {timings['hash'] / iterations:.4f} ms ({payload_size_kb:.1f}KB)")
+    timer.print_results(payload_size_kb)
 
 def main():
     # Pass debug=True to see the pipeline traces, debug=False to only see benchmark results
