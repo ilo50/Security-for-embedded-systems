@@ -1,9 +1,10 @@
 class VehicleECU:
-    def __init__(self, ecu_id, verify_func, hash_func, director_public_key, image_repo_public_key, debug=False):
+    def __init__(self, ecu_id, verify_func, hash_func, decrypt_func, director_public_key, image_repo_public_key, debug=False):
         self.ecu_id = ecu_id
         self.installed_version = "v1.0"
         self.verify_func = verify_func
         self.hash_func = hash_func
+        self.decrypt_func = decrypt_func
         self.director_public_key = director_public_key
         self.image_repo_public_key = image_repo_public_key
         self.debug = debug
@@ -28,7 +29,8 @@ class VehicleECU:
             
         return True
 
-    def verify_and_install_firmware(self, firmware, image_repo_payload, target_version):
+    def verify_and_install_firmware(self, firmware, director_payload, image_repo_payload, target_version):
+        # 1. Verify against metadata of the downloaded (raw encrypted) firmware first
         expected_size = image_repo_payload["metadata"]["size"]
         expected_hash = image_repo_payload["metadata"]["hash"]
 
@@ -39,6 +41,16 @@ class VehicleECU:
             if self.debug: print(f"[{self.ecu_id}] [FAIL] Firmware payload hash/size mismatch. Aborting update.")
             return False
 
-        if self.debug: print(f"[{self.ecu_id}] [OK] Firmware verification succeeds. Installing firmware...")
+        # 2. Step 4.5: Decrypt Firmware using the symmetric key securely delivered in Step 3
+        if self.debug: print(f"[{self.ecu_id}] Hash verified! Decrypting downloaded firmware...")
+        symmetric_key = bytes.fromhex(director_payload["metadata"]["symmetric_key"])
+        
+        try:
+            decrypted_firmware = self.decrypt_func(symmetric_key, firmware)
+        except Exception as e:
+            if self.debug: print(f"[{self.ecu_id}] [FAIL] Firmware decryption failed! Aborting update error: {e}")
+            return False
+
+        if self.debug: print(f"[{self.ecu_id}] [OK] Firmware verification and decryption succeeds. Installing firmware...")
         self.installed_version = target_version
         return True

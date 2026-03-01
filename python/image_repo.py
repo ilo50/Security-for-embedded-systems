@@ -1,15 +1,20 @@
 class ImageRepository:
-    def __init__(self, private_key, sign_func, hash_func):
+    def __init__(self, private_key, sign_func, hash_func, symmetric_key, encrypt_func):
         self.private_key = private_key
         self.sign_func = sign_func
         self.hash_func = hash_func
-        # Simulate an actual firmware blob available in the repo
-        self.firmwares = {
-            "v2.0": b"1010101_FIRMWARE_PAYLOAD_DATA_1010101" * 1000  # Fake binary payload
-        }
+        
+        self.symmetric_key = symmetric_key
+        self.encrypt_func = encrypt_func
+        self.raw_firmware = b"1010101_FIRMWARE_PAYLOAD_DATA_1010101" * 1000  # 38KB
+        self.firmwares = {}
 
     def get_targets_metadata(self, version):
         """Step 3b/4b: Provide signed targets metadata specifying update details."""
+        # Encrypt the firmware for this request to accurately benchmark the encryption step
+        encrypted_blob = self.encrypt_func(self.symmetric_key, self.raw_firmware)
+        self.firmwares[version] = encrypted_blob
+        
         firmware = self.firmwares.get(version)
         if not firmware:
             return None

@@ -2,6 +2,8 @@ from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
+import os
 
 # 1. Ed25519 Implementations
 def ed25519_keygen():
@@ -39,3 +41,29 @@ def compute_sha256(data):
     digest = hashes.Hash(hashes.SHA256())
     digest.update(data)
     return digest.finalize()
+
+# 4. Symmetric Encryption (Payload) - AES-GCM
+def aes_gcm_keygen():
+    return AESGCM.generate_key(bit_length=256)
+
+def aes_gcm_encrypt(key, data):
+    nonce = os.urandom(12)
+    return nonce + AESGCM(key).encrypt(nonce, data, None)
+
+def aes_gcm_decrypt(key, cipher_data):
+    nonce = cipher_data[:12]
+    ciphertext = cipher_data[12:]
+    return AESGCM(key).decrypt(nonce, ciphertext, None)
+
+# 5. Symmetric Encryption (Payload) - ChaCha20-Poly1305
+def chacha20_keygen():
+    return ChaCha20Poly1305.generate_key()
+
+def chacha20_encrypt(key, data):
+    nonce = os.urandom(12)
+    return nonce + ChaCha20Poly1305(key).encrypt(nonce, data, None)
+
+def chacha20_decrypt(key, cipher_data):
+    nonce = cipher_data[:12]
+    ciphertext = cipher_data[12:]
+    return ChaCha20Poly1305(key).decrypt(nonce, ciphertext, None)

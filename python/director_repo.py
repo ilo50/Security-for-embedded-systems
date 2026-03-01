@@ -1,7 +1,8 @@
 class DirectorRepository:
-    def __init__(self, private_key, sign_func, debug=False):
+    def __init__(self, private_key, sign_func, symmetric_key, debug=False):
         self.private_key = private_key
         self.sign_func = sign_func
+        self.symmetric_key = symmetric_key
         self.debug = debug
 
     def analyze_manifest_and_get_targets(self, manifest):
@@ -14,7 +15,8 @@ class DirectorRepository:
             
         metadata = {
             "ecu_id": manifest.get("ecu_id"),
-            "target_version": target_version
+            "target_version": target_version,
+            "symmetric_key": self.symmetric_key.hex() # Secure delivery of decryption key
         }
         
         # Sign the metadata directing the ECU to download the specific version
