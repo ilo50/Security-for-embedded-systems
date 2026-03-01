@@ -1,6 +1,8 @@
 class VehicleECU:
-    def __init__(self, ecu_id, verify_func, hash_func, decrypt_func, director_public_key, image_repo_public_key, debug=False):
+    def __init__(self, ecu_id, private_key, sign_func, verify_func, hash_func, decrypt_func, director_public_key, image_repo_public_key, debug=False):
         self.ecu_id = ecu_id
+        self.private_key = private_key
+        self.sign_func = sign_func
         self.installed_version = "v1.0"
         self.verify_func = verify_func
         self.hash_func = hash_func
@@ -11,7 +13,13 @@ class VehicleECU:
 
     def send_manifest(self):
         """Step 1 & Step 6: Generate Vehicle Manifest"""
-        return {"ecu_id": self.ecu_id, "installed_version": self.installed_version}
+        manifest = {"ecu_id": self.ecu_id, "installed_version": self.installed_version}
+        manifest_bytes = str(manifest).encode('utf-8')
+        signature = self.sign_func(self.private_key, manifest_bytes)
+        return {
+            "manifest": manifest,
+            "signature": signature.hex()
+        }
 
     def verify_metadata(self, director_payload, image_repo_payload):
         if self.debug: print(f"[{self.ecu_id}] Cross-validating metadata and verifying signatures...")

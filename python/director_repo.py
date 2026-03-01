@@ -1,12 +1,26 @@
 class DirectorRepository:
-    def __init__(self, private_key, sign_func, symmetric_key, debug=False):
+    def __init__(self, private_key, sign_func, symmetric_key, ecu_public_key, verify_func, debug=False):
         self.private_key = private_key
         self.sign_func = sign_func
         self.symmetric_key = symmetric_key
+        self.ecu_public_key = ecu_public_key
+        self.verify_func = verify_func
         self.debug = debug
 
-    def analyze_manifest_and_get_targets(self, manifest):
+    def analyze_manifest_and_get_targets(self, payload):
         """Step 2 & 3: Analyze ECU state, decide next version, return signed metadata."""
+        manifest = payload.get("manifest")
+        signature = bytes.fromhex(payload.get("signature", ""))
+
+        # Verify ECU signature before doing anything
+        manifest_bytes = str(manifest).encode('utf-8')
+        try:
+            self.verify_func(self.ecu_public_key, signature, manifest_bytes)
+            if self.debug: print(f"[Director] Successfully verified manifest signature from ECU.")
+        except Exception:
+            if self.debug: print(f"[Director] [FAIL] ECU Manifest signature verification failed! Rejecting request.")
+            return None
+
         current_version = manifest.get("installed_version")
         target_version = "v2.0" # Hardcoded target for simulation
         

@@ -18,6 +18,7 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
     setup_start = time.perf_counter()
     director_priv, director_pub = key_gen_func()
     image_priv, image_pub = key_gen_func()
+    ecu_priv, ecu_pub = key_gen_func()
     sym_key = sym_key_gen()
     if debug: print(f"[Setup] Key generation took: {(time.perf_counter() - setup_start)*1000:.4f} ms")
 
@@ -53,9 +54,9 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
         timings['encrypt'] += (time.perf_counter() - start) * 1000
         return res
 
-    director = DirectorRepository(director_priv, timed_sign, sym_key, debug=debug)
+    director = DirectorRepository(director_priv, timed_sign, sym_key, ecu_pub, timed_verify, debug=debug)
     image_repo = ImageRepository(image_priv, timed_sign, timed_hash, sym_key, timed_encrypt)
-    ecu = VehicleECU("ECU_FRONT_01", timed_verify, timed_hash, timed_decrypt, director_pub, image_pub, debug=debug)
+    ecu = VehicleECU("ECU_FRONT_01", ecu_priv, timed_sign, timed_verify, timed_hash, timed_decrypt, director_pub, image_pub, debug=debug)
 
     total_flow_time = 0.0
 
