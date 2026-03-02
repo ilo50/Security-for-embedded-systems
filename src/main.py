@@ -117,7 +117,7 @@ def run_benchmark(dir_sign_label, image_sign_label, hash_label, enc_label,
     # Determine the payload size dynamically from the ECU's download context
     # raw_firmware inside image_repo is ~38000 bytes. 
     # For a more exact label, we fetch its size:
-    payload_size_kb = len(image_repo.raw_firmware) / 1024.0
+    payload_size_kb = len(image_repo.raw_firmware) / 1000.0
 
     timer.print_results(payload_size_kb)
 
