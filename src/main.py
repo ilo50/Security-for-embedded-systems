@@ -4,21 +4,25 @@ from image_repo import ImageRepository
 from vehicle_ecu import VehicleECU
 import crypto_algorithms as crypto
 
-def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, verify_func, hash_func, sym_key_gen, encrypt_func, decrypt_func, iterations=100, debug=False):
+def run_benchmark(dir_sign_label, image_sign_label, hash_label, enc_label, 
+                  dir_key_gen_func, dir_sign_func, dir_verify_func, 
+                  image_key_gen_func, image_sign_func, image_verify_func, 
+                  hash_func, sym_key_gen, encrypt_func, decrypt_func, iterations=100, debug=False):
     """Orchestrates the modular components, showing the Uptane pipeline and timing it."""
     print(f"\n{'='*60}")
     print("Running Uptane Benchmark")
     print(f"Iterations: {iterations}")
-    print(f"Signing/Verifying: {sign_label}")
+    print(f"Director Sign/Verify: {dir_sign_label}")
+    print(f"Image Repo Sign/Verify: {image_sign_label}")
     print(f"Payload enc/dec: {enc_label}")
     print(f"Hashing: {hash_label}")
     print(f"{'='*60}")
 
     # --- Setup Phase (Not timed for the flow benchmark) ---
     setup_start = time.perf_counter()
-    director_priv, director_pub = key_gen_func()
-    image_priv, image_pub = key_gen_func()
-    ecu_priv, ecu_pub = key_gen_func()
+    director_priv, director_pub = dir_key_gen_func()
+    image_priv, image_pub = image_key_gen_func()
+    ecu_priv, ecu_pub = dir_key_gen_func()
     sym_key = sym_key_gen()
     if debug: print(f"[Setup] Key generation took: {(time.perf_counter() - setup_start)*1000:.4f} ms")
 
@@ -26,15 +30,15 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
 
     director = DirectorRepository(
         director_priv, 
-        timer.timed_op(sign_func, 'identity_sign'), 
+        timer.timed_op(dir_sign_func, 'identity_sign'), 
         sym_key, 
         ecu_pub, 
-        timer.timed_op(verify_func, 'identity_verify'), 
+        timer.timed_op(dir_verify_func, 'identity_verify'), 
         debug=debug
     )
     image_repo = ImageRepository(
         image_priv, 
-        timer.timed_op(sign_func, 'payload_sign'), 
+        timer.timed_op(image_sign_func, 'payload_sign'), 
         timer.timed_op(hash_func, 'hash'), 
         sym_key, 
         timer.timed_op(encrypt_func, 'encrypt')
@@ -42,9 +46,9 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
     ecu = VehicleECU(
         "ECU_FRONT_01", 
         ecu_priv, 
-        timer.timed_op(sign_func, 'identity_sign'), 
-        timer.timed_op(verify_func, 'identity_verify'), 
-        timer.timed_op(verify_func, 'payload_verify'), 
+        timer.timed_op(dir_sign_func, 'identity_sign'), 
+        timer.timed_op(dir_verify_func, 'identity_verify'), 
+        timer.timed_op(image_verify_func, 'payload_verify'), 
         timer.timed_op(hash_func, 'hash'), 
         timer.timed_op(decrypt_func, 'decrypt'), 
         director_pub, 
@@ -117,12 +121,16 @@ def run_benchmark(sign_label, hash_label, enc_label, key_gen_func, sign_func, ve
     timer.print_results(payload_size_kb)
 
 def main():
-    # Pass debug=True to see the pipeline traces, debug=False to only see benchmark results
+    # 1: Sign/verf: Vehicle <-> Director
+    # 2: Sign/verf: Image Repo -> Vehicle
+    # 3: Hash: Firmware Payload
+    # 4: Encrypt/Decrypt: Firmware Payload
+    
+    # --- 1: Asymmetric / Asymmetric ---
     run_benchmark(
-        "Ed25519", "SHA256", "AES-GCM",
-        crypto.ed25519_keygen, 
-        crypto.ed25519_sign, 
-        crypto.ed25519_verify, 
+        "Ed25519", "Ed25519", "SHA256", "AES-GCM",
+        crypto.ed25519_keygen, crypto.ed25519_sign, crypto.ed25519_verify, 
+        crypto.ed25519_keygen, crypto.ed25519_sign, crypto.ed25519_verify, 
         crypto.compute_sha256,
         crypto.aes_gcm_keygen,
         crypto.aes_gcm_encrypt,
@@ -131,15 +139,41 @@ def main():
         debug=False
     )
 
+    # --- 1 (Alternative): Asymmetric / Asymmetric (RSA) ---
     run_benchmark(
-        "RSA-2048", "SHA256", "ChaCha20-Poly1305",
-        crypto.rsa_keygen, 
-        crypto.rsa_sign, 
-        crypto.rsa_verify, 
+        "RSA-2048", "RSA-2048", "SHA256", "ChaCha20-Poly1305",
+        crypto.rsa_keygen, crypto.rsa_sign, crypto.rsa_verify, 
+        crypto.rsa_keygen, crypto.rsa_sign, crypto.rsa_verify, 
         crypto.compute_sha256,
         crypto.chacha20_keygen,
         crypto.chacha20_encrypt,
         crypto.chacha20_decrypt,
+        iterations=100,
+        debug=False
+    )
+
+    # --- 3: Symmetric (HMAC) / Asymmetric (Ed25519) ---
+    run_benchmark(
+        "HMAC-SHA256", "Ed25519", "SHA256", "AES-GCM",
+        crypto.hmac_keygen, crypto.hmac_sign, crypto.hmac_verify, 
+        crypto.ed25519_keygen, crypto.ed25519_sign, crypto.ed25519_verify, 
+        crypto.compute_sha256,
+        crypto.aes_gcm_keygen,
+        crypto.aes_gcm_encrypt,
+        crypto.aes_gcm_decrypt,
+        iterations=100,
+        debug=False
+    )
+
+    # --- 4: Symmetric (HMAC) / Symmetric (HMAC) ---
+    run_benchmark(
+        "HMAC-SHA256", "HMAC-SHA256", "SHA256", "AES-GCM",
+        crypto.hmac_keygen, crypto.hmac_sign, crypto.hmac_verify, 
+        crypto.hmac_keygen, crypto.hmac_sign, crypto.hmac_verify, 
+        crypto.compute_sha256,
+        crypto.aes_gcm_keygen,
+        crypto.aes_gcm_encrypt,
+        crypto.aes_gcm_decrypt,
         iterations=100,
         debug=False
     )
