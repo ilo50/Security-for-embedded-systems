@@ -7,7 +7,7 @@ import crypto_algorithms as crypto
 def run_benchmark(dir_sign_label, image_sign_label, hash_label, enc_label, 
                   dir_key_gen_func, dir_sign_func, dir_verify_func, 
                   image_key_gen_func, image_sign_func, image_verify_func, 
-                  hash_func, sym_key_gen, encrypt_func, decrypt_func, iterations=100, debug=False):
+                  hash_func, sym_key_gen, encrypt_func, decrypt_func, payload_size_bytes=1000000, iterations=100, debug=False):
     """Orchestrates the modular components, showing the Uptane pipeline and timing it."""
     print(f"\n{'='*60}")
     print("Running Uptane Benchmark")
@@ -41,7 +41,8 @@ def run_benchmark(dir_sign_label, image_sign_label, hash_label, enc_label,
         timer.timed_op(image_sign_func, 'payload_sign'), 
         timer.timed_op(hash_func, 'hash'), 
         sym_key, 
-        timer.timed_op(encrypt_func, 'encrypt')
+        timer.timed_op(encrypt_func, 'encrypt'),
+        payload_size_bytes=payload_size_bytes
     )
     ecu = VehicleECU(
         "ECU_FRONT_01", 
@@ -135,6 +136,7 @@ def main():
         crypto.aes_gcm_keygen,
         crypto.aes_gcm_encrypt,
         crypto.aes_gcm_decrypt,
+        payload_size_bytes=1000000, # 1MB
         iterations=100,
         debug=False
     )
@@ -148,6 +150,7 @@ def main():
         crypto.chacha20_keygen,
         crypto.chacha20_encrypt,
         crypto.chacha20_decrypt,
+        payload_size_bytes=1000000, # 1MB
         iterations=100,
         debug=False
     )
@@ -161,6 +164,7 @@ def main():
         crypto.aes_gcm_keygen,
         crypto.aes_gcm_encrypt,
         crypto.aes_gcm_decrypt,
+        payload_size_bytes=1000000, # 1MB
         iterations=100,
         debug=False
     )
@@ -174,6 +178,7 @@ def main():
         crypto.aes_gcm_keygen,
         crypto.aes_gcm_encrypt,
         crypto.aes_gcm_decrypt,
+        payload_size_bytes=1000000, # 1MB
         iterations=100,
         debug=False
     )

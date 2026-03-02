@@ -1,12 +1,14 @@
 class ImageRepository:
-    def __init__(self, private_key, sign_func, hash_func, symmetric_key, encrypt_func):
+    def __init__(self, private_key, sign_func, hash_func, symmetric_key, encrypt_func, payload_size_bytes):
         self.private_key = private_key
         self.sign_func = sign_func
         self.hash_func = hash_func
         
         self.symmetric_key = symmetric_key
         self.encrypt_func = encrypt_func
-        self.raw_firmware = b"1010101_FIRMWARE_PAYLOAD_DATA_1010101" * 1000  # 38KB
+        
+        # Generate dummy firmware of the requested size dynamically
+        self.raw_firmware = b"A" * payload_size_bytes
         self.firmwares = {}
 
     def get_targets_metadata(self, version):
